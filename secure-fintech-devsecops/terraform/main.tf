@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~>3.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~>3.0"
+    }
   }
 }
 
@@ -30,12 +34,20 @@ resource "azurerm_virtual_network" "vnet" {
   resource_group_name = azurerm_resource_group.rg.name
 }
 
+# Subnet for general use
+resource "azurerm_subnet" "subnet" {
+  name                 = "fintech-subnet"
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
 # Subnet for AKS
 resource "azurerm_subnet" "aks_subnet" {
   name                 = "aks-subnet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = ["10.0.2.0/24"]
 }
 
 # Log Analytics Workspace
@@ -45,6 +57,20 @@ resource "azurerm_log_analytics_workspace" "law" {
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
+}
+
+# Azure Container Registry
+resource "random_integer" "suffix" {
+  min = 1000
+  max = 9999
+}
+
+resource "azurerm_container_registry" "acr" {
+  name                = "fintechacr${random_integer.suffix.result}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+  admin_enabled       = false
 }
 
 # AKS Cluster
@@ -69,8 +95,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   network_profile {
-    network_plugin = "azure"
-    network_policy = "azure"
+    network_plugin     = "azure"
+    network_policy     = "azure"
+    service_cidr       = "10.0.3.0/24"
+    dns_service_ip     = "10.0.3.10"
+    docker_bridge_cidr = "172.17.0.1/16"
   }
 
   oms_agent {
@@ -89,21 +118,6 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   role_definition_name             = "AcrPull"
   scope                            = azurerm_container_registry.acr.id
   skip_service_principal_aad_check = true
-}
-
-# Azure Container Registry
-resource "azurerm_container_registry" "acr" {
-  name                = "fintechacr${random_integer.suffix.result}"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  sku                 = "Basic"
-  admin_enabled       = false
-}
-
-# Random suffix for ACR name
-resource "random_integer" "suffix" {
-  min = 1000
-  max = 9999
 }
 
 # Outputs
