@@ -23,6 +23,10 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Change to source directory
+        run: echo "Changed working directory"
+        working-directory: ./secure-fintech-devsecops
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -37,8 +41,7 @@ jobs:
             pip install fastapi uvicorn sqlalchemy pydantic
           fi
           pip install pytest pytest-cov httpx bandit
-      
-      # Removed test directory creation and placeholder test
+        working-directory: ./secure-fintech-devsecops
       
       - name: Run tests with coverage
         run: |
@@ -47,6 +50,7 @@ jobs:
           else
             echo "No app directory found, skipping tests"
           fi
+        working-directory: ./secure-fintech-devsecops
       
       - name: Run Bandit Security Scan
         run: |
@@ -55,12 +59,13 @@ jobs:
           else
             echo '{"results": [], "metrics": {}}' > bandit-report.json
           fi
+        working-directory: ./secure-fintech-devsecops
       
       - name: Upload Bandit Report
         uses: actions/upload-artifact@v4
         with:
           name: bandit-report
-          path: bandit-report.json
+          path: secure-fintech-devsecops/bandit-report.json
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -69,6 +74,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Change to source directory
+        run: echo "Changed working directory"
+        working-directory: ./secure-fintech-devsecops
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -83,23 +92,25 @@ jobs:
             pip install fastapi uvicorn sqlalchemy pydantic
           fi
           pip install pytest pytest-cov httpx
+        working-directory: ./secure-fintech-devsecops
       
       - name: Run tests
         run: |
-          # Removed reference to app/tests directory, now just running pytest if app directory exists
           if [ -d "app" ]; then
             pytest --cov=app --cov-report=xml --cov-report=html || echo "Tests failed but continuing pipeline"
           else
             echo "No app directory found, skipping tests"
           fi
-
+        working-directory: ./secure-fintech-devsecops
+      
       - name: Verify dockerfile exists
         run: |
           if [ ! -f ./dockerfile ]; then
             echo "ERROR: dockerfile not found!"
             exit 1
           fi
-
+        working-directory: ./secure-fintech-devsecops
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -127,7 +138,8 @@ jobs:
           docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
           docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
-
+        working-directory: ./secure-fintech-devsecops
+      
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -145,7 +157,7 @@ jobs:
             ls -la
             exit 1
           fi
-
+      
       - name: Upload Trivy scan results
         if: steps.check-sarif-file.outputs.exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
@@ -154,4 +166,8 @@ jobs:
 
       - name: Test Docker container
         run: |
-          docker run -d --name test-containe
+          docker run -d --name test-container -p 8000:8000 ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          sleep 10
+          curl --fail http://localhost:8000/ || (docker logs test-container && exit 1)
+          docker stop test-container
+          docker rm test-container
