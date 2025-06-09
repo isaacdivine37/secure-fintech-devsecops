@@ -60,19 +60,8 @@ jobs:
             echo "No app directory found, skipping tests"
           fi
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2.3.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.projectKey=isaacdivine37_secure-fintech-devsecops
-            -Dsonar.organization=isaacdivine37
-            -Dsonar.sources=app
-            -Dsonar.tests=app/tests
-            -Dsonar.python.coverage.reportPaths=coverage.xml
-            -Dsonar.exclusions=**/migrations/**,**/venv/**,**/__pycache__/**,**/node_modules/**
+      # SonarCloud analysis removed - using Automatic Analysis in SonarCloud instead
+      # If you want CI-based analysis, disable Automatic Analysis in SonarCloud settings
 
       - name: Run Bandit Security Scan
         run: |
