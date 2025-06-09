@@ -50,7 +50,7 @@ jobs:
           else
             echo "No app directory found, skipping tests"
           fi
-
+      
       - name: Run Bandit Security Scan
         run: |
           if [ -d "app" ]; then
@@ -58,7 +58,7 @@ jobs:
           else
             echo '{"results": [], "metrics": {}}' > bandit-report.json
           fi
-
+      
       - name: Upload Bandit Report
         uses: actions/upload-artifact@v4
         with:
@@ -94,7 +94,14 @@ jobs:
           else
             echo "No tests directory found, skipping tests"
           fi
-      
+
+      - name: Verify Dockerfile exists
+        run: |
+          if [ ! -f ./Dockerfile ]; then
+            echo "ERROR: Dockerfile not found!"
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -131,18 +138,19 @@ jobs:
           output: trivy-results.sarif
 
       - name: Check if SARIF file exists
+        id: check-sarif-file
         run: |
           if [ -f trivy-results.sarif ]; then
-            echo "Trivy SARIF file created successfully."
+            echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "ERROR: Trivy SARIF file not found!"
+            echo "exists=false" >> $GITHUB_OUTPUT
             ls -la
             exit 1
           fi
 
       - name: Upload Trivy scan results
+        if: steps.check-sarif-file.outputs.exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
         with:
           sarif_file: trivy-results.sarif
 
