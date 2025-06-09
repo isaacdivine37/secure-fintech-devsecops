@@ -95,10 +95,10 @@ jobs:
             echo "No tests directory found, skipping tests"
           fi
 
-      - name: Verify Dockerfile exists
+      - name: Verify dockerfile exists
         run: |
-          if [ ! -f ./Dockerfile ]; then
-            echo "ERROR: Dockerfile not found!"
+          if [ ! -f ./dockerfile ]; then
+            echo "ERROR: dockerfile not found!"
             exit 1
           fi
 
